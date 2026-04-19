@@ -7,7 +7,8 @@ export type OnboardingState = {
   suggestedApp: string | null;
   frequency: string;
   pledgeAmount: number;
-  trackingApp: string | null; // chosen app, or null = manual
+  trackingApp: string | null;
+  recommendedTrackingMethod: "timer" | "connected" | "manual" | null;
 };
 
 const KEY = "sworn_onboarding";

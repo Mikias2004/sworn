@@ -15,7 +15,6 @@ export async function POST(req: NextRequest) {
     frequency,
     pledge_amount,
     tracking_app,
-    start_date,
   } = await req.json();
 
   if (!title || !frequency || !pledge_amount) {
@@ -44,8 +43,7 @@ export async function POST(req: NextRequest) {
       metric,
       pledge_amount,
       status: "active",
-      // tracking_app stored as metadata in the title for MVP
-      // (real integration column can be added to schema later)
+      tracking_app: tracking_app ?? null,
     })
     .select("*")
     .single();

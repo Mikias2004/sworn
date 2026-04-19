@@ -21,6 +21,45 @@ const statusLabel: Record<string, string> = {
   archived: "Archived",
 };
 
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    return reg;
+  } catch {
+    return null;
+  }
+}
+
+async function subscribeToPush(reg: ServiceWorkerRegistration): Promise<PushSubscription | null> {
+  try {
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!publicKey) return null;
+
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) return existing;
+
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    return sub;
+  } catch {
+    return null;
+  }
+}
+
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const bytes = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    bytes[i] = rawData.charCodeAt(i);
+  }
+  return bytes.buffer as ArrayBuffer;
+}
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -29,6 +68,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [notifStatus, setNotifStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -38,6 +78,7 @@ export default function DashboardPage() {
     if (status === "authenticated") {
       fetchGoals();
       checkPaymentMethod();
+      checkNotificationPermission();
     }
   }, [status]);
 
@@ -59,6 +100,41 @@ export default function DashboardPage() {
     }
   };
 
+  const checkNotificationPermission = () => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      setNotifStatus("granted");
+      ensurePushSubscription();
+    } else if (Notification.permission === "denied") {
+      setNotifStatus("denied");
+    }
+  };
+
+  const ensurePushSubscription = async () => {
+    const reg = await registerServiceWorker();
+    if (!reg) return;
+    const sub = await subscribeToPush(reg);
+    if (sub) {
+      await fetch("/api/notifications/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (!("Notification" in window)) return;
+    setNotifStatus("requesting");
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      setNotifStatus("granted");
+      await ensurePushSubscription();
+    } else {
+      setNotifStatus("denied");
+    }
+  };
+
   const handleArchive = async (id: string) => {
     await fetch(`/api/goals/${id}`, { method: "DELETE" });
     setGoals((prev) => prev.filter((g) => g.id !== id));
@@ -68,15 +144,7 @@ export default function DashboardPage() {
 
   if (status === "loading" || (status === "authenticated" && loading)) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bg)",
-        }}
-      >
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
         <p style={{ fontSize: 14, color: "var(--text-tertiary)" }}>Loading…</p>
       </div>
     );
@@ -98,51 +166,23 @@ export default function DashboardPage() {
           zIndex: 100,
         }}
       >
-        <Link
-          href="/"
-          style={{
-            fontSize: 18,
-            fontWeight: 500,
-            color: "var(--text-primary)",
-            letterSpacing: "-0.02em",
-            textDecoration: "none",
-          }}
-        >
+        <Link href="/" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>
           Sworn.
         </Link>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           {session?.user?.name && (
-            <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-              {session.user.name}
-            </span>
+            <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>{session.user.name}</span>
           )}
           <button
             onClick={() => setShowModal(true)}
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              background: "var(--text-primary)",
-              color: "#fff",
-              padding: "8px 18px",
-              borderRadius: 8,
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={{ fontSize: 13, fontWeight: 500, background: "var(--text-primary)", color: "#fff", padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit" }}
           >
             + New goal
           </button>
           <button
             onClick={() => signOut({ callbackUrl: "/" })}
-            style={{
-              fontSize: 13,
-              color: "var(--text-secondary)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
+            style={{ fontSize: 13, color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
           >
             Log out
           </button>
@@ -151,94 +191,54 @@ export default function DashboardPage() {
 
       {/* No payment method banner */}
       {hasPaymentMethod === false && (
-        <div
-          style={{
-            background: "#FFF8EC",
-            borderBottom: "0.5px solid rgba(181,130,40,0.25)",
-            padding: "12px 40px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
+        <div style={{ background: "#FFF8EC", borderBottom: "0.5px solid rgba(181,130,40,0.25)", padding: "12px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <p style={{ fontSize: 13, color: "#854F0B" }}>
-            Add a payment method before setting a goal — it&apos;s what makes
-            the commitment real.
+            Add a payment method before setting a goal — it&apos;s what makes the commitment real.
           </p>
           <Link
             href="/dashboard/add-payment"
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "#854F0B",
-              background: "rgba(181,130,40,0.12)",
-              border: "0.5px solid rgba(181,130,40,0.3)",
-              padding: "6px 14px",
-              borderRadius: 8,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
+            style={{ fontSize: 13, fontWeight: 500, color: "#854F0B", background: "rgba(181,130,40,0.12)", border: "0.5px solid rgba(181,130,40,0.3)", padding: "6px 14px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
           >
             Add card →
           </Link>
         </div>
       )}
 
+      {/* Notification permission banner */}
+      {notifStatus === "idle" && "Notification" in (typeof window !== "undefined" ? window : {}) && Notification.permission === "default" && (
+        <div style={{ background: "#F0F4FF", borderBottom: "0.5px solid rgba(37,99,235,0.2)", padding: "12px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <p style={{ fontSize: 13, color: "#1e40af" }}>
+            Turn on reminders — Sworn will nudge you when it&apos;s time to log your session.
+          </p>
+          <button
+            onClick={requestNotificationPermission}
+            style={{ fontSize: 13, fontWeight: 500, color: "#1e40af", background: "rgba(37,99,235,0.1)", border: "0.5px solid rgba(37,99,235,0.25)", padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}
+          >
+            Enable reminders
+          </button>
+        </div>
+      )}
+
       {/* Content */}
       <main style={{ maxWidth: 860, margin: "0 auto", padding: "48px 40px" }}>
         <div style={{ marginBottom: 32 }}>
-          <h1
-            style={{
-              fontSize: 26,
-              fontWeight: 500,
-              letterSpacing: "-0.02em",
-              color: "var(--text-primary)",
-              marginBottom: 6,
-            }}
-          >
+          <h1 style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 6 }}>
             Your goals
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-            {activeGoals.length} active{" "}
-            {activeGoals.length === 1 ? "goal" : "goals"}
+            {activeGoals.length} active {activeGoals.length === 1 ? "goal" : "goals"}
           </p>
         </div>
 
         {goals.length === 0 ? (
           <div style={{ textAlign: "center", padding: "72px 20px" }}>
-            <p
-              style={{
-                fontSize: 15,
-                color: "var(--text-secondary)",
-                marginBottom: 8,
-              }}
-            >
-              No goals yet.
-            </p>
-            <p
-              style={{
-                fontSize: 13,
-                color: "var(--text-tertiary)",
-                marginBottom: 28,
-              }}
-            >
+            <p style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 8 }}>No goals yet.</p>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 28 }}>
               Set your first goal and put something on the line.
             </p>
             <button
               onClick={() => setShowModal(true)}
-              style={{
-                fontSize: 14,
-                fontWeight: 500,
-                background: "var(--text-primary)",
-                color: "#fff",
-                padding: "12px 28px",
-                borderRadius: 8,
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
+              style={{ fontSize: 14, fontWeight: 500, background: "var(--text-primary)", color: "#fff", padding: "12px 28px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit" }}
             >
               Set your first goal
             </button>
@@ -260,67 +260,49 @@ export default function DashboardPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: statusDot[goal.status] ?? "#888",
-                      flexShrink: 0,
-                    }}
-                  />
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusDot[goal.status] ?? "#888", flexShrink: 0 }} />
                   <div>
-                    <p
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 500,
-                        color: "var(--text-primary)",
-                        marginBottom: 4,
-                      }}
-                    >
+                    <p style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)", marginBottom: 4 }}>
                       {goal.title}
                     </p>
                     <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                       {goal.frequency} · {goal.metric} · {statusLabel[goal.status]}
+                      {goal.tracking_app ? ` · ${goal.tracking_app}` : ""}
                     </p>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                  <span
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                    }}
-                  >
+                  {/* Streak badge */}
+                  {goal.status === "active" && (goal.streak_count ?? 0) > 0 && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "#854F0B",
+                        background: "#FFF8EC",
+                        border: "0.5px solid rgba(181,130,40,0.3)",
+                        borderRadius: 99,
+                        padding: "2px 10px",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={`${goal.streak_count} day streak`}
+                    >
+                      {goal.streak_count} day streak
+                    </span>
+                  )}
+
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
                     ${goal.pledge_amount}
                   </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: "var(--text-tertiary)",
-                      border: "0.5px solid var(--border)",
-                      borderRadius: 99,
-                      padding: "2px 10px",
-                      background: "#fff",
-                    }}
-                  >
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", border: "0.5px solid var(--border)", borderRadius: 99, padding: "2px 10px", background: "#fff" }}>
                     on the line
                   </span>
                   {goal.status === "active" && (
                     <button
                       onClick={() => handleArchive(goal.id)}
                       title="Archive goal"
-                      style={{
-                        fontSize: 11,
-                        color: "var(--text-tertiary)",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: "4px 8px",
-                        fontFamily: "inherit",
-                      }}
+                      style={{ fontSize: 11, color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit" }}
                     >
                       Archive
                     </button>

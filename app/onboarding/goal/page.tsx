@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { setOnboarding } from "@/lib/onboarding";
 import type { ParsedGoal } from "@/app/api/onboarding/parse-goal/route";
+import type { AppRecommendation } from "@/app/api/onboarding/recommend-app/route";
 
 export default function GoalPage() {
   const { status } = useSession();
@@ -13,16 +14,16 @@ export default function GoalPage() {
   const [raw, setRaw] = useState("");
   const [loading, setLoading] = useState(false);
   const [parsed, setParsed] = useState<ParsedGoal | null>(null);
+  const [recommendation, setRecommendation] = useState<AppRecommendation | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
-    // Auto-focus on mount
     inputRef.current?.focus();
   }, [status]);
 
-  // Check if onboarding should be skipped
   useEffect(() => {
     if (status !== "authenticated") return;
     (async () => {
@@ -45,26 +46,41 @@ export default function GoalPage() {
     if (!raw.trim()) return;
     setError("");
     setLoading(true);
+    setRecLoading(true);
     setParsed(null);
+    setRecommendation(null);
 
-    const res = await fetch("/api/onboarding/parse-goal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw }),
-    });
+    // Parse goal and get recommendation in parallel
+    const [parseRes, recRes] = await Promise.all([
+      fetch("/api/onboarding/parse-goal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw }),
+      }),
+      fetch("/api/onboarding/recommend-app", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw }),
+      }),
+    ]);
 
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error ?? "Something went wrong.");
+    const parseData = await parseRes.json();
+    if (!parseRes.ok) {
+      setError(parseData.error ?? "Something went wrong.");
       setLoading(false);
+      setRecLoading(false);
       return;
     }
 
-    setParsed(data);
+    setParsed(parseData);
     setLoading(false);
+
+    const recData = await recRes.json();
+    setRecommendation(recData);
+    setRecLoading(false);
   };
 
-  const handleConfirm = () => {
+  const proceedWithApp = (appName: string | null) => {
     if (!parsed) return;
     setOnboarding({
       raw,
@@ -72,58 +88,36 @@ export default function GoalPage() {
       confirmation: parsed.confirmation,
       goalType: parsed.goalType,
       suggestedFrequency: parsed.suggestedFrequency,
-      suggestedApp: parsed.suggestedApp,
+      suggestedApp: appName,
+      trackingApp: appName,
     });
     router.push("/onboarding/frequency");
   };
 
   const handleChange = () => {
     setParsed(null);
+    setRecommendation(null);
     setRaw("");
     setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   if (status === "loading") return null;
 
+  const hasApp = recommendation?.app_name != null;
+  const skipLabel =
+    recommendation?.tracking_method === "manual"
+      ? "Skip, log manually"
+      : "Skip, use timer instead";
+
   return (
-    <main
-      style={{
-        maxWidth: 560,
-        margin: "0 auto",
-        padding: "52px 24px 40px",
-      }}
-    >
-      <p
-        style={{
-          fontSize: 11,
-          color: "var(--text-tertiary)",
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          marginBottom: 12,
-        }}
-      >
+    <main style={{ maxWidth: 560, margin: "0 auto", padding: "52px 24px 40px" }}>
+      <p style={{ fontSize: 11, color: "var(--text-tertiary)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
         Step 1 of 5
       </p>
-      <h1
-        style={{
-          fontSize: 28,
-          fontWeight: 500,
-          letterSpacing: "-0.025em",
-          color: "var(--text-primary)",
-          lineHeight: 1.2,
-          marginBottom: 10,
-        }}
-      >
+      <h1 style={{ fontSize: 28, fontWeight: 500, letterSpacing: "-0.025em", color: "var(--text-primary)", lineHeight: 1.2, marginBottom: 10 }}>
         Let&apos;s build your first commitment.
       </h1>
-      <p
-        style={{
-          fontSize: 15,
-          color: "var(--text-secondary)",
-          marginBottom: 32,
-          lineHeight: 1.6,
-        }}
-      >
+      <p style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 32, lineHeight: 1.6 }}>
         Type your goal the way you&apos;d say it out loud.
       </p>
 
@@ -133,7 +127,7 @@ export default function GoalPage() {
           value={raw}
           onChange={(e) => {
             setRaw(e.target.value);
-            if (parsed) setParsed(null);
+            if (parsed) { setParsed(null); setRecommendation(null); }
           }}
           placeholder="I want to go to the gym 4 times a week…"
           rows={3}
@@ -162,15 +156,7 @@ export default function GoalPage() {
         />
 
         {error && (
-          <p
-            style={{
-              fontSize: 13,
-              color: "#A32D2D",
-              marginTop: 10,
-            }}
-          >
-            {error}
-          </p>
+          <p style={{ fontSize: 13, color: "#A32D2D", marginTop: 10 }}>{error}</p>
         )}
 
         {!parsed && (
@@ -211,7 +197,6 @@ export default function GoalPage() {
           }}
         >
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-            {/* Sworn avatar dot */}
             <div
               style={{
                 width: 28,
@@ -227,52 +212,136 @@ export default function GoalPage() {
             >
               <span style={{ fontSize: 11, color: "#fff", fontWeight: 500 }}>S</span>
             </div>
-            <p
-              style={{
-                fontSize: 15,
-                color: "var(--text-primary)",
-                lineHeight: 1.6,
-                margin: 0,
-              }}
-            >
+            <p style={{ fontSize: 15, color: "var(--text-primary)", lineHeight: 1.6, margin: 0 }}>
               {parsed.confirmation}
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={handleChange}
-              style={{
-                flex: 1,
-                fontSize: 14,
-                color: "var(--text-secondary)",
-                background: "#fff",
-                border: "0.5px solid var(--border-md)",
-                padding: "12px 0",
-                borderRadius: 8,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Change it
-            </button>
-            <button
-              onClick={handleConfirm}
-              style={{
-                flex: 2,
-                fontSize: 14,
-                fontWeight: 500,
-                background: "var(--text-primary)",
-                color: "#fff",
-                padding: "12px 0",
-                borderRadius: 8,
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Yes, that&apos;s it →
-            </button>
+          <button
+            onClick={handleChange}
+            style={{
+              width: "100%",
+              fontSize: 14,
+              color: "var(--text-secondary)",
+              background: "#fff",
+              border: "0.5px solid var(--border-md)",
+              padding: "10px 0",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Change it
+          </button>
+        </div>
+      )}
+
+      {/* App recommendation card */}
+      {parsed && (recLoading || recommendation) && (
+        <div
+          style={{
+            marginTop: 12,
+            border: "0.5px solid var(--border)",
+            borderRadius: 12,
+            overflow: "hidden",
+            animation: "fadeSlideUp 0.3s ease",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              background: "var(--text-primary)",
+              padding: "14px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#fff" }}>
+              Sworn recommends
+            </span>
+          </div>
+
+          <div style={{ background: "var(--bg-secondary)", padding: "16px 18px" }}>
+            {recLoading ? (
+              <p style={{ fontSize: 14, color: "var(--text-tertiary)", margin: 0 }}>
+                Finding the best app for your goal…
+              </p>
+            ) : recommendation ? (
+              <>
+                <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.6, marginBottom: 16, margin: "0 0 16px" }}>
+                  {hasApp ? (
+                    <>
+                      <strong>{recommendation.app_name}</strong>
+                      {" — "}
+                      {recommendation.app_reason}
+                    </>
+                  ) : (
+                    <>No app tracks this automatically. {recommendation.app_reason}</>
+                  )}
+                </p>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {hasApp ? (
+                    <>
+                      <button
+                        onClick={() => proceedWithApp(recommendation.app_name)}
+                        style={{
+                          flex: 2,
+                          minWidth: 120,
+                          fontSize: 14,
+                          fontWeight: 500,
+                          background: "var(--text-primary)",
+                          color: "#fff",
+                          padding: "12px 16px",
+                          borderRadius: 8,
+                          border: "none",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        Connect {recommendation.app_name} →
+                      </button>
+                      <button
+                        onClick={() => proceedWithApp(null)}
+                        style={{
+                          flex: 1,
+                          minWidth: 100,
+                          fontSize: 13,
+                          color: "var(--text-secondary)",
+                          background: "#fff",
+                          border: "0.5px solid var(--border-md)",
+                          padding: "12px 12px",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {skipLabel}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => proceedWithApp(null)}
+                      style={{
+                        width: "100%",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        background: "var(--text-primary)",
+                        color: "#fff",
+                        padding: "12px 0",
+                        borderRadius: 8,
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Use built-in timer →
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       )}
