@@ -34,29 +34,36 @@ export default function ConfirmPage() {
   const saveGoal = async (s: ReturnType<typeof getOnboarding>) => {
     if (!s.title || saving || saved) return;
     setSaving(true);
+    setError("");
 
-    const res = await fetch("/api/onboarding/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: s.title,
-        frequency: s.frequency,
-        pledge_amount: s.pledgeAmount,
-        tracking_app: s.trackingApp,
-        tracking_method: s.recommendedTrackingMethod ?? (s.trackingApp ? "connected" : "manual"),
-        connected_app: s.trackingApp ?? null,
-        start_date: getStartDate(s.frequency ?? "weekly").toISOString(),
-        started_via_goal_id: s.startedViaGoalId ?? null,
-        started_via_type: s.startedViaType ?? null,
-      }),
-    });
+    try {
+      const res = await fetch("/api/onboarding/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: s.title,
+          frequency: s.frequency,
+          pledge_amount: s.pledgeAmount,
+          tracking_app: s.trackingApp,
+          tracking_method: s.recommendedTrackingMethod ?? (s.trackingApp ? "connected" : "manual"),
+          connected_app: s.trackingApp ?? null,
+          started_via_goal_id: s.startedViaGoalId ?? null,
+          started_via_type: s.startedViaType ?? null,
+        }),
+      });
 
-    if (res.ok) {
-      setSaved(true);
-      clearOnboarding();
-    } else {
-      const d = await res.json();
-      setError(d.error ?? "Failed to save your goal. Please try again.");
+      if (res.ok) {
+        setSaved(true);
+        clearOnboarding();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        const msg = d.error ?? "Failed to save your goal. Please try again.";
+        console.error("Goal save failed:", msg);
+        setError(msg);
+      }
+    } catch (err) {
+      console.error("Goal save error:", err);
+      setError("Something went wrong. Please try again.");
     }
     setSaving(false);
   };
@@ -78,6 +85,73 @@ export default function ConfirmPage() {
 
   const hasApp = !!state.trackingApp;
 
+  // Loading state — save in progress
+  if (saving && !saved) {
+    return (
+      <main style={{ maxWidth: 480, margin: "0 auto", padding: "52px 24px 56px", textAlign: "center" }}>
+        <div style={{ color: "var(--text-tertiary)", fontSize: 15 }}>Saving your commitment…</div>
+      </main>
+    );
+  }
+
+  // Error state — save failed, let user retry
+  if (error && !saved) {
+    return (
+      <main style={{ maxWidth: 480, margin: "0 auto", padding: "52px 24px 56px", textAlign: "center" }}>
+        <p
+          style={{
+            fontSize: 14,
+            color: "#A32D2D",
+            background: "#FDF2F2",
+            padding: "14px 16px",
+            borderRadius: 10,
+            border: "0.5px solid rgba(163,45,45,0.2)",
+            marginBottom: 20,
+            textAlign: "left",
+            lineHeight: 1.5,
+          }}
+        >
+          {error}
+        </p>
+        <button
+          onClick={() => saveGoal(state)}
+          style={{
+            width: "100%",
+            fontSize: 15,
+            fontWeight: 500,
+            background: "var(--text-primary)",
+            color: "#fff",
+            padding: "14px 0",
+            borderRadius: 10,
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            marginBottom: 14,
+          }}
+        >
+          Try again
+        </button>
+        <button
+          onClick={() => router.back()}
+          style={{
+            width: "100%",
+            fontSize: 14,
+            color: "var(--text-secondary)",
+            background: "none",
+            border: "0.5px solid var(--border-md)",
+            padding: "12px 0",
+            borderRadius: 10,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Go back
+        </button>
+      </main>
+    );
+  }
+
+  // Success state
   return (
     <main style={{ maxWidth: 480, margin: "0 auto", padding: "52px 24px 56px", textAlign: "center" }}>
       {/* Checkmark */}
@@ -158,29 +232,12 @@ export default function ConfirmPage() {
                 </span>
               )}
               <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)", textAlign: "right" }}>
-                {saving && row.label === "Goal" ? "Saving…" : row.value}
+                {row.value}
               </span>
             </div>
           </div>
         ))}
       </div>
-
-      {error && (
-        <p
-          style={{
-            fontSize: 13,
-            color: "#A32D2D",
-            background: "#FDF2F2",
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: "0.5px solid rgba(163,45,45,0.2)",
-            marginBottom: 20,
-            textAlign: "left",
-          }}
-        >
-          {error}
-        </p>
-      )}
 
       <Link
         href="/dashboard"
