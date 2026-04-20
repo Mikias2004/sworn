@@ -152,7 +152,7 @@ export default function FriendsPage() {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 40px", borderBottom: "0.5px solid var(--border)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 100 }}>
-          <Link href="/" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>Sworn.</Link>
+          <Link href="/dashboard" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>Sworn.</Link>
         </header>
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px", maxWidth: 440, margin: "0 auto", textAlign: "center" }}>
@@ -230,7 +230,7 @@ export default function FriendsPage() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 40px", borderBottom: "0.5px solid var(--border)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 100 }}>
-        <Link href="/" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>Sworn.</Link>
+        <Link href="/dashboard" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>Sworn.</Link>
       </header>
 
       <main style={{ maxWidth: 600, margin: "0 auto", padding: "32px 20px" }}>

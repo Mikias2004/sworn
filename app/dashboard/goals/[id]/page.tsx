@@ -117,7 +117,7 @@ export default function GoalDetailPage() {
         >
           ←
         </button>
-        <Link href="/" style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>
+        <Link href="/dashboard" style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>
           Sworn.
         </Link>
       </header>

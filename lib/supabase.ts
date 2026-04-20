@@ -51,8 +51,12 @@ export type Goal = {
   tracking_method: "timer" | "connected" | "manual" | null;
   connected_app: string | null;
   target_duration_seconds: number | null;
+  target_count: number | null;
+  target_unit: string | null;
+  period_target: number | null;
   streak_count: number;
   last_completed_date: string | null;
+  last_synced_at: string | null;
   last_notified_at: string | null;
   // Populated by the goals list endpoint (last 7 days)
   recent_datapoints?: Datapoint[];

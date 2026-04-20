@@ -53,7 +53,7 @@ export default function SettingsPage() {
           zIndex: 100,
         }}
       >
-        <Link href="/" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>
+        <Link href="/dashboard" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>
           Sworn.
         </Link>
         {session?.user?.name && (
