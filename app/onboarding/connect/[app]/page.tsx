@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { setOnboarding, getOnboarding } from "@/lib/onboarding";
 import { getAppBySlug } from "@/lib/apps";
 
-export default function ConnectAppPage() {
+function ConnectAppInner() {
   const { status } = useSession();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.app as string;
 
   const [authorizing, setAuthorizing] = useState(false);
   const [done, setDone] = useState(false);
 
   const app = getAppBySlug(slug);
+  const next = searchParams.get("next") ?? "/onboarding/stake";
 
   useEffect(() => {
     if (status === "unauthenticated") { router.push("/login"); return; }
@@ -37,7 +39,7 @@ export default function ConnectAppPage() {
     });
 
     setDone(true);
-    setTimeout(() => router.push("/onboarding/stake"), 300);
+    setTimeout(() => router.push(next), 300);
   };
 
   if (status === "loading" || !app) return null;
@@ -50,7 +52,6 @@ export default function ConnectAppPage() {
 
   return (
     <main style={{ maxWidth: 480, margin: "0 auto", padding: "52px 24px 60px" }}>
-      {/* Card */}
       <div
         style={{
           background: "var(--bg-secondary)",
@@ -60,7 +61,6 @@ export default function ConnectAppPage() {
           textAlign: "center",
         }}
       >
-        {/* App icon */}
         <div
           style={{
             width: 56,
@@ -104,7 +104,6 @@ export default function ConnectAppPage() {
           post or modify anything.
         </p>
 
-        {/* Permissions */}
         <div
           style={{
             textAlign: "left",
@@ -139,15 +138,8 @@ export default function ConnectAppPage() {
           ))}
         </div>
 
-        <div
-          style={{
-            height: "0.5px",
-            background: "var(--border)",
-            margin: "0 0 24px",
-          }}
-        />
+        <div style={{ height: "0.5px", background: "var(--border)", margin: "0 0 24px" }} />
 
-        {/* Authorize button */}
         <button
           onClick={handleAuthorize}
           disabled={authorizing || done}
@@ -192,7 +184,6 @@ export default function ConnectAppPage() {
         </p>
       </div>
 
-      {/* Back link */}
       <button
         onClick={() => router.back()}
         style={{
@@ -211,5 +202,13 @@ export default function ConnectAppPage() {
         ← Go back
       </button>
     </main>
+  );
+}
+
+export default function ConnectAppPage() {
+  return (
+    <Suspense fallback={null}>
+      <ConnectAppInner />
+    </Suspense>
   );
 }

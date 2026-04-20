@@ -18,6 +18,10 @@ export async function POST(req: NextRequest) {
     tracking_method,
     connected_app,
     target_duration_seconds,
+    target_count,
+    target_unit,
+    period_target,
+    custom_schedule,
     started_via_goal_id,
     started_via_type,
   } = await req.json();
@@ -55,6 +59,10 @@ export async function POST(req: NextRequest) {
       tracking_method: derivedMethod,
       connected_app: connected_app ?? tracking_app ?? null,
       target_duration_seconds: target_duration_seconds ?? null,
+      target_count: target_count ?? null,
+      target_unit: target_unit ?? null,
+      period_target: period_target ?? null,
+      custom_schedule: custom_schedule ?? null,
       started_via_goal_id: started_via_goal_id ?? null,
       started_via_type: started_via_type ?? null,
     })

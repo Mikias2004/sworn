@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import type { Goal, Datapoint } from "@/lib/supabase";
-import NewGoalModal from "./NewGoalModal";
 import BottomNav from "@/components/dashboard/BottomNav";
 
 async function registerServiceWorker() {
@@ -134,7 +133,6 @@ export default function DashboardPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
-  const [showModal, setShowModal] = useState(false);
   const [notifStatus, setNotifStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
 
   useEffect(() => {
@@ -227,7 +225,7 @@ export default function DashboardPage() {
           Sworn.
         </Link>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => router.push("/onboarding/goal")}
           style={{ fontSize: 13, fontWeight: 500, background: "var(--text-primary)", color: "#fff", padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit" }}
         >
           + New goal
@@ -274,7 +272,7 @@ export default function DashboardPage() {
               Set your first goal and put something on the line.
             </p>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => router.push("/onboarding/goal")}
               style={{ fontSize: 14, fontWeight: 500, background: "var(--text-primary)", color: "#fff", padding: "12px 28px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit" }}
             >
               Set your first goal
@@ -356,14 +354,6 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
-
-      {showModal && (
-        <NewGoalModal
-          hasPaymentMethod={hasPaymentMethod === true}
-          onClose={() => setShowModal(false)}
-          onCreated={(goal) => { setGoals((prev) => [goal, ...prev]); setShowModal(false); }}
-        />
-      )}
 
       <BottomNav />
 
