@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import type { Goal } from "@/lib/supabase";
+import { getAppByName, getAppIconUrl } from "@/lib/apps";
 import BottomNav from "@/components/dashboard/BottomNav";
 
 // ---- Push notification helpers ----
@@ -219,9 +220,13 @@ function GoalCard({ goal }: { goal: Goal }) {
   }
 
   // Sync label
+  const connectedAppInfo =
+    goal.tracking_method === "connected" && goal.connected_app
+      ? getAppByName(goal.connected_app)
+      : null;
   let syncText = "Manual";
   if (goal.tracking_method === "timer") syncText = "Built-in timer";
-  else if (goal.tracking_method === "connected" && goal.connected_app) {
+  else if (goal.connected_app) {
     const synced = relativeTime(goal.last_synced_at);
     syncText = synced ? `${goal.connected_app} · ${synced}` : `${goal.connected_app} · auto`;
   }
@@ -375,7 +380,17 @@ function GoalCard({ goal }: { goal: Goal }) {
             <>🔥 <span style={{ color: "var(--text-tertiary)" }}>New commitment</span></>
           )}
         </span>
-        <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+        <span style={{ fontSize: 10, color: "var(--text-tertiary)", display: "flex", alignItems: "center", gap: 4 }}>
+          {connectedAppInfo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={getAppIconUrl(connectedAppInfo.iconSlug, connectedAppInfo.iconColor)}
+              width={12}
+              height={12}
+              alt={connectedAppInfo.name}
+              style={{ display: "block", opacity: 0.7 }}
+            />
+          )}
           {syncText}
         </span>
       </div>

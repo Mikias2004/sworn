@@ -16,7 +16,7 @@ import {
   clearOnboarding,
   getStartDate,
 } from "@/lib/onboarding";
-import { ALL_APPS, FEATURED_APPS, getAppByName, type AppInfo } from "@/lib/apps";
+import { ALL_APPS, FEATURED_APPS, getAppByName, getAppIconUrl, type AppInfo } from "@/lib/apps";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -243,18 +243,22 @@ function AppTile({
           width: 36,
           height: 36,
           borderRadius: 9,
-          background: app.bg,
-          color: app.color,
-          border: app.border,
+          background: "rgba(0,0,0,0.04)",
+          border: "0.5px solid rgba(0,0,0,0.07)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 13,
-          fontWeight: 600,
           flexShrink: 0,
         }}
       >
-        {app.letter}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={getAppIconUrl(app.iconSlug, app.iconColor)}
+          width={22}
+          height={22}
+          alt={app.name}
+          style={{ display: "block" }}
+        />
       </div>
       <span
         style={{

@@ -4,30 +4,29 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { getOnboarding, setOnboarding } from "@/lib/onboarding";
+import { getAppIconUrl } from "@/lib/apps";
 
 type App = {
   name: string;
-  letter: string;
-  bg: string;
-  color: string;
-  border?: string;
+  iconSlug: string;
+  iconColor: string;
   goalTypes: Array<"fitness" | "productivity" | "learning" | "health" | "other" | "all">;
 };
 
 const ALL_APPS: App[] = [
-  { name: "Apple Health", letter: "A", bg: "#1a1a1a", color: "#fff", goalTypes: ["fitness", "health"] },
-  { name: "Strava",       letter: "S", bg: "#FC4C02", color: "#fff", goalTypes: ["fitness"] },
-  { name: "Fitbit",       letter: "F", bg: "#00B0B9", color: "#fff", goalTypes: ["fitness", "health"] },
-  { name: "Garmin",       letter: "G", bg: "#007CC3", color: "#fff", goalTypes: ["fitness"] },
-  { name: "Runkeeper",    letter: "R", bg: "#3BB4E5", color: "#fff", goalTypes: ["fitness"] },
-  { name: "Oura Ring",    letter: "O", bg: "#2D2D2D", color: "#C8A951", goalTypes: ["health", "fitness"] },
-  { name: "Whoop",        letter: "W", bg: "#111",    color: "#00FF87", goalTypes: ["health", "fitness"] },
-  { name: "Notion",       letter: "N", bg: "#fff",    color: "#0d0d0d", border: "0.5px solid rgba(0,0,0,0.14)", goalTypes: ["productivity"] },
-  { name: "Todoist",      letter: "T", bg: "#DB4035", color: "#fff", goalTypes: ["productivity"] },
-  { name: "GitHub",       letter: "G", bg: "#24292F", color: "#fff", goalTypes: ["productivity"] },
-  { name: "RescueTime",   letter: "R", bg: "#1B4F72", color: "#fff", goalTypes: ["productivity"] },
-  { name: "Duolingo",     letter: "D", bg: "#58CC02", color: "#fff", goalTypes: ["learning"] },
-  { name: "Spotify",      letter: "S", bg: "#1DB954", color: "#fff", goalTypes: ["learning", "all"] },
+  { name: "Apple Health", iconSlug: "apple",       iconColor: "000000", goalTypes: ["fitness", "health"] },
+  { name: "Strava",       iconSlug: "strava",      iconColor: "FC4C02", goalTypes: ["fitness"] },
+  { name: "Fitbit",       iconSlug: "fitbit",      iconColor: "00B0B9", goalTypes: ["fitness", "health"] },
+  { name: "Garmin",       iconSlug: "garmin",      iconColor: "007CC3", goalTypes: ["fitness"] },
+  { name: "Runkeeper",    iconSlug: "runkeeper",   iconColor: "1F63FF", goalTypes: ["fitness"] },
+  { name: "Oura Ring",    iconSlug: "oura",        iconColor: "000000", goalTypes: ["health", "fitness"] },
+  { name: "Whoop",        iconSlug: "whoop",       iconColor: "0A0A0A", goalTypes: ["health", "fitness"] },
+  { name: "Notion",       iconSlug: "notion",      iconColor: "000000", goalTypes: ["productivity"] },
+  { name: "Todoist",      iconSlug: "todoist",     iconColor: "E44332", goalTypes: ["productivity"] },
+  { name: "GitHub",       iconSlug: "github",      iconColor: "181717", goalTypes: ["productivity"] },
+  { name: "RescueTime",   iconSlug: "rescuetime",  iconColor: "161A3B", goalTypes: ["productivity"] },
+  { name: "Duolingo",     iconSlug: "duolingo",    iconColor: "58CC02", goalTypes: ["learning"] },
+  { name: "Spotify",      iconSlug: "spotify",     iconColor: "1DB954", goalTypes: ["learning", "all"] },
 ];
 
 function getRelevantApps(goalType: string): App[] {
@@ -141,15 +140,19 @@ export default function ConnectPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  background: isSelected ? "rgba(255,255,255,0.15)" : app.bg,
-                  color: isSelected ? "#fff" : app.color,
-                  border: isSelected ? "none" : app.border,
+                  background: isSelected ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.04)",
+                  border: isSelected ? "none" : "0.5px solid rgba(0,0,0,0.07)",
                   flexShrink: 0,
                 }}
               >
-                {app.letter}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getAppIconUrl(app.iconSlug, app.iconColor)}
+                  width={24}
+                  height={24}
+                  alt={app.name}
+                  style={{ display: "block", filter: isSelected ? "brightness(0) invert(1)" : "none" }}
+                />
               </div>
               <span
                 style={{

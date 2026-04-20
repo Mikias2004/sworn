@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { setOnboarding, getOnboarding } from "@/lib/onboarding";
-import { getAppBySlug } from "@/lib/apps";
+import { getAppBySlug, getAppIconUrl } from "@/lib/apps";
 
 function ConnectAppInner() {
   const { status } = useSession();
@@ -66,19 +66,23 @@ function ConnectAppInner() {
             width: 56,
             height: 56,
             borderRadius: 14,
-            background: app.bg,
-            color: app.color,
-            border: app.border,
+            background: "rgba(0,0,0,0.04)",
+            border: "0.5px solid rgba(0,0,0,0.07)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 20,
-            fontWeight: 700,
             margin: "0 auto 20px",
             flexShrink: 0,
           }}
         >
-          {app.letter}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={getAppIconUrl(app.iconSlug, app.iconColor)}
+            width={32}
+            height={32}
+            alt={app.name}
+            style={{ display: "block" }}
+          />
         </div>
 
         <h1

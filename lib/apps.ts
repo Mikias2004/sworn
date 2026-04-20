@@ -5,6 +5,10 @@ export type AppInfo = {
   bg: string;
   color: string;
   border?: string;
+  /** Simple Icons CDN slug — https://cdn.simpleicons.org/[iconSlug]/[iconColor] */
+  iconSlug: string;
+  /** Brand hex color (no #) used to tint the Simple Icons SVG on a light background */
+  iconColor: string;
   activity: string;
   metricLabel: string;
   permission2: string;
@@ -19,6 +23,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "S",
     bg: "#FC4C02",
     color: "#fff",
+    iconSlug: "strava",
+    iconColor: "FC4C02",
     activity: "runs, rides, and swims",
     metricLabel: "distance and duration",
     permission2: "Verify pace, distance, and duration",
@@ -31,6 +37,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "A",
     bg: "#1a1a1a",
     color: "#fff",
+    iconSlug: "apple",
+    iconColor: "000000",
     activity: "workouts",
     metricLabel: "workout type and duration",
     permission2: "Verify workout type and duration",
@@ -43,6 +51,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "D",
     bg: "#58CC02",
     color: "#fff",
+    iconSlug: "duolingo",
+    iconColor: "58CC02",
     activity: "lessons and XP",
     metricLabel: "XP earned and lessons completed",
     permission2: "Verify XP earned and lessons completed",
@@ -55,6 +65,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "T",
     bg: "#DB4035",
     color: "#fff",
+    iconSlug: "todoist",
+    iconColor: "E44332",
     activity: "completed tasks",
     metricLabel: "tasks completed",
     permission2: "Verify tasks marked complete",
@@ -67,6 +79,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "F",
     bg: "#00B0B9",
     color: "#fff",
+    iconSlug: "fitbit",
+    iconColor: "00B0B9",
     activity: "workouts and steps",
     metricLabel: "activity minutes and steps",
     permission2: "Verify activity minutes and steps",
@@ -79,6 +93,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "G",
     bg: "#007CC3",
     color: "#fff",
+    iconSlug: "garmin",
+    iconColor: "007CC3",
     activity: "activities",
     metricLabel: "distance and duration",
     permission2: "Verify workout data and duration",
@@ -91,6 +107,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "R",
     bg: "#3BB4E5",
     color: "#fff",
+    iconSlug: "runkeeper",
+    iconColor: "1F63FF",
     activity: "runs and walks",
     metricLabel: "distance and pace",
     permission2: "Verify distance and pace",
@@ -103,6 +121,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "O",
     bg: "#2D2D2D",
     color: "#C8A951",
+    iconSlug: "oura",
+    iconColor: "000000",
     activity: "sleep and recovery data",
     metricLabel: "sleep score and recovery",
     permission2: "Verify sleep score and recovery",
@@ -115,6 +135,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "W",
     bg: "#111",
     color: "#00FF87",
+    iconSlug: "whoop",
+    iconColor: "0A0A0A",
     activity: "strain and recovery data",
     metricLabel: "strain score and recovery",
     permission2: "Verify strain and recovery scores",
@@ -128,6 +150,8 @@ export const ALL_APPS: AppInfo[] = [
     bg: "#fff",
     color: "#0d0d0d",
     border: "0.5px solid rgba(0,0,0,0.14)",
+    iconSlug: "notion",
+    iconColor: "000000",
     activity: "pages and tasks",
     metricLabel: "pages created and tasks completed",
     permission2: "Verify pages created and tasks done",
@@ -140,6 +164,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "G",
     bg: "#24292F",
     color: "#fff",
+    iconSlug: "github",
+    iconColor: "181717",
     activity: "commits",
     metricLabel: "commits and pull requests",
     permission2: "Verify commits and PRs",
@@ -152,6 +178,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "R",
     bg: "#1B4F72",
     color: "#fff",
+    iconSlug: "rescuetime",
+    iconColor: "161A3B",
     activity: "focus sessions",
     metricLabel: "focused time",
     permission2: "Verify focused time logged",
@@ -164,6 +192,8 @@ export const ALL_APPS: AppInfo[] = [
     letter: "M",
     bg: "#0066CC",
     color: "#fff",
+    iconSlug: "myfitnesspal",
+    iconColor: "0066CC",
     activity: "meals and nutrition",
     metricLabel: "calories and macros logged",
     permission2: "Verify meals and calories logged",
@@ -175,6 +205,11 @@ export const ALL_APPS: AppInfo[] = [
 export const FEATURED_APPS = ALL_APPS.filter((a) =>
   ["strava", "apple-health", "duolingo", "todoist"].includes(a.slug)
 );
+
+/** Returns the Simple Icons CDN URL for an app icon, colored for use on a light background. */
+export function getAppIconUrl(iconSlug: string, iconColor = "000000"): string {
+  return `https://cdn.simpleicons.org/${iconSlug}/${iconColor}`;
+}
 
 export function getAppBySlug(slug: string): AppInfo | null {
   return ALL_APPS.find((a) => a.slug === slug) ?? null;

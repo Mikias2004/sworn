@@ -1,31 +1,19 @@
-const integrations = [
-  { label: "F", name: "Fitbit", bg: "#00B0B9", color: "#fff" },
-  { label: "S", name: "Strava", bg: "#FC4C02", color: "#fff" },
-  { label: "A", name: "Apple Health", bg: "#1a1a1a", color: "#fff" },
-  { label: "Sl", name: "Slack", bg: "#4A154B", color: "#fff" },
-  { label: "Sp", name: "Spotify", bg: "#1DB954", color: "#fff" },
-  { label: "D", name: "Duolingo", bg: "#58CC02", color: "#fff" },
-  { label: "G", name: "Garmin", bg: "#007CC3", color: "#fff" },
-  { label: "T", name: "Todoist", bg: "#DB4035", color: "#fff" },
-  {
-    label: "N",
-    name: "Notion",
-    bg: "#fff",
-    color: "#0d0d0d",
-    border: "0.5px solid rgba(0,0,0,0.14)",
-  },
-  { label: "G", name: "GitHub", bg: "#24292F", color: "#fff" },
-  {
-    label: "G",
-    name: "Google Fit",
-    bg: "#fff",
-    color: "#4285F4",
-    border: "0.5px solid rgba(0,0,0,0.14)",
-  },
-  { label: "R", name: "RescueTime", bg: "#1B4F72", color: "#fff" },
-  { label: "W", name: "Whoop", bg: "#111", color: "#00FF87" },
-  { label: "O", name: "Oura Ring", bg: "#2D2D2D", color: "#C8A951" },
-  { label: "R", name: "Runkeeper", bg: "#3BB4E5", color: "#fff" },
+const integrations: Array<{ name: string; iconSlug: string; iconColor: string }> = [
+  { name: "Strava",       iconSlug: "strava",       iconColor: "FC4C02" },
+  { name: "Apple Health", iconSlug: "apple",        iconColor: "000000" },
+  { name: "Fitbit",       iconSlug: "fitbit",       iconColor: "00B0B9" },
+  { name: "Duolingo",     iconSlug: "duolingo",     iconColor: "58CC02" },
+  { name: "Garmin",       iconSlug: "garmin",       iconColor: "007CC3" },
+  { name: "Runkeeper",    iconSlug: "runkeeper",    iconColor: "1F63FF" },
+  { name: "Todoist",      iconSlug: "todoist",      iconColor: "E44332" },
+  { name: "Notion",       iconSlug: "notion",       iconColor: "000000" },
+  { name: "GitHub",       iconSlug: "github",       iconColor: "181717" },
+  { name: "Google Fit",   iconSlug: "googlefit",    iconColor: "00C853" },
+  { name: "RescueTime",   iconSlug: "rescuetime",   iconColor: "161A3B" },
+  { name: "Whoop",        iconSlug: "whoop",        iconColor: "0A0A0A" },
+  { name: "Oura Ring",    iconSlug: "oura",         iconColor: "000000" },
+  { name: "Spotify",      iconSlug: "spotify",      iconColor: "1DB954" },
+  { name: "Slack",        iconSlug: "slack",        iconColor: "4A154B" },
 ];
 
 export default function Integrations() {
@@ -56,9 +44,9 @@ export default function Integrations() {
       </div>
 
       <div className="integrations-grid">
-        {integrations.map((item, i) => (
+        {integrations.map((item) => (
           <div
-            key={i}
+            key={item.name}
             style={{
               background: "var(--bg-secondary)",
               border: "0.5px solid var(--border)",
@@ -72,21 +60,25 @@ export default function Integrations() {
           >
             <div
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 8,
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: "rgba(0,0,0,0.04)",
+                border: "0.5px solid rgba(0,0,0,0.07)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 500,
-                background: item.bg,
-                color: item.color,
-                border: item.border,
                 flexShrink: 0,
               }}
             >
-              {item.label}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://cdn.simpleicons.org/${item.iconSlug}/${item.iconColor}`}
+                width={24}
+                height={24}
+                alt={item.name}
+                style={{ display: "block" }}
+              />
             </div>
             <span
               style={{
