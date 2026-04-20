@@ -30,6 +30,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const successParam = searchParams.get("success");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,77 +58,135 @@ function LoginForm() {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{ display: "flex", flexDirection: "column", gap: 16 }}
-    >
-      <div>
-        <label htmlFor="email" style={labelStyle}>
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          required
-          style={inputStyle}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="password" style={labelStyle}>
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Your password"
-          required
-          style={inputStyle}
-        />
-      </div>
-
-      {error && (
+    <>
+      {successParam === "password-updated" && (
         <p
           style={{
             fontSize: 13,
-            color: "#A32D2D",
-            background: "#FDF2F2",
+            color: "#2D7A4A",
+            background: "#F2FDF5",
             padding: "10px 14px",
             borderRadius: 8,
-            border: "0.5px solid rgba(163,45,45,0.2)",
+            border: "0.5px solid rgba(45,122,74,0.2)",
+            marginBottom: 16,
           }}
         >
-          {error}
+          Password updated. Sign in with your new password.
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        style={{
-          width: "100%",
-          fontSize: 14,
-          fontWeight: 500,
-          background: "var(--text-primary)",
-          color: "#fff",
-          padding: "12px 0",
-          borderRadius: 8,
-          border: "none",
-          cursor: loading ? "default" : "pointer",
-          fontFamily: "inherit",
-          marginTop: 4,
-          opacity: loading ? 0.6 : 1,
-          transition: "opacity 0.15s ease",
-        }}
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
-        {loading ? "Logging in…" : "Log in"}
-      </button>
-    </form>
+        <div>
+          <label htmlFor="email" style={labelStyle}>
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            style={inputStyle}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" style={labelStyle}>
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your password"
+            required
+            style={inputStyle}
+          />
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              marginTop: 8,
+            }}
+          >
+            <Link
+              href="/forgot-password"
+              style={{
+                fontSize: 12,
+                color: "var(--text-tertiary)",
+                textDecoration: "none",
+              }}
+              onMouseEnter={(e) =>
+                ((e.target as HTMLElement).style.color = "var(--text-secondary)")
+              }
+              onMouseLeave={(e) =>
+                ((e.target as HTMLElement).style.color = "var(--text-tertiary)")
+              }
+            >
+              Forgot password?
+            </Link>
+            <Link
+              href="/forgot-username"
+              style={{
+                fontSize: 12,
+                color: "var(--text-tertiary)",
+                textDecoration: "none",
+              }}
+              onMouseEnter={(e) =>
+                ((e.target as HTMLElement).style.color = "var(--text-secondary)")
+              }
+              onMouseLeave={(e) =>
+                ((e.target as HTMLElement).style.color = "var(--text-tertiary)")
+              }
+            >
+              Forgot username?
+            </Link>
+          </div>
+        </div>
+
+        {error && (
+          <p
+            style={{
+              fontSize: 13,
+              color: "#A32D2D",
+              background: "#FDF2F2",
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "0.5px solid rgba(163,45,45,0.2)",
+            }}
+          >
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            fontSize: 14,
+            fontWeight: 500,
+            background: "var(--text-primary)",
+            color: "#fff",
+            padding: "12px 0",
+            borderRadius: 8,
+            border: "none",
+            cursor: loading ? "default" : "pointer",
+            fontFamily: "inherit",
+            marginTop: 4,
+            opacity: loading ? 0.6 : 1,
+            transition: "opacity 0.15s ease",
+          }}
+        >
+          {loading ? "Logging in…" : "Log in"}
+        </button>
+      </form>
+    </>
   );
 }
 

@@ -2,24 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import type { Goal } from "@/lib/supabase";
+import type { Goal, Datapoint } from "@/lib/supabase";
 import NewGoalModal from "./NewGoalModal";
-
-const statusDot: Record<string, string> = {
-  active: "#3B6D11",
-  completed: "#185FA5",
-  failed: "#A32D2D",
-  archived: "#888780",
-};
-
-const statusLabel: Record<string, string> = {
-  active: "Active",
-  completed: "Completed",
-  failed: "Failed",
-  archived: "Archived",
-};
+import BottomNav from "@/components/dashboard/BottomNav";
 
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
@@ -35,10 +22,8 @@ async function subscribeToPush(reg: ServiceWorkerRegistration): Promise<PushSubs
   try {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicKey) return null;
-
     const existing = await reg.pushManager.getSubscription();
     if (existing) return existing;
-
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey),
@@ -54,14 +39,96 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(base64);
   const bytes = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; i++) {
-    bytes[i] = rawData.charCodeAt(i);
-  }
+  for (let i = 0; i < rawData.length; i++) bytes[i] = rawData.charCodeAt(i);
   return bytes.buffer as ArrayBuffer;
 }
 
+function isGoalDueOnDay(frequency: string, date: Date): boolean {
+  const day = date.getDay();
+  if (frequency === "daily") return true;
+  if (frequency === "4x_week") return day >= 1 && day <= 4;
+  if (frequency === "3x_week") return day === 1 || day === 3 || day === 5;
+  return true;
+}
+
+type DotStatus = "done" | "missed" | "today" | "partial" | "off";
+
+function getWeekDots(goal: Goal): Array<{ status: DotStatus }> {
+  const dots: Array<{ status: DotStatus }> = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split("T")[0];
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dStr = d.toISOString().split("T")[0];
+    const due = isGoalDueOnDay(goal.frequency, d);
+
+    if (!due) { dots.push({ status: "off" }); continue; }
+
+    const dp = (goal.recent_datapoints ?? []).find(
+      (p: Datapoint) => p.logged_at.split("T")[0] === dStr
+    );
+
+    if (dStr === todayStr) {
+      if (dp) dots.push({ status: dp.met_target ? "done" : "partial" });
+      else dots.push({ status: "today" });
+    } else {
+      if (dp) dots.push({ status: dp.met_target ? "done" : "partial" });
+      else dots.push({ status: "missed" });
+    }
+  }
+  return dots;
+}
+
+function getDotColor(status: string): string {
+  if (status === "done") return "#3B6D11";
+  if (status === "partial") return "#854F0B";
+  if (status === "missed") return "#A32D2D";
+  if (status === "today") return "rgba(0,0,0,0.15)";
+  return "rgba(0,0,0,0.07)";
+}
+
+function getCardStatusDot(goal: Goal): string {
+  const today = new Date().toISOString().split("T")[0];
+  const dp = (goal.recent_datapoints ?? []).find(
+    (p: Datapoint) => p.logged_at.split("T")[0] === today
+  );
+  if (dp) return dp.met_target ? "#3B6D11" : "#854F0B";
+  if (goal.last_completed_date) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (goal.last_completed_date < yesterday.toISOString().split("T")[0]) return "#A32D2D";
+  }
+  return "#854F0B";
+}
+
+function getTodayMeta(goal: Goal): string {
+  const today = new Date().toISOString().split("T")[0];
+  const dp = (goal.recent_datapoints ?? []).find(
+    (p: Datapoint) => p.logged_at.split("T")[0] === today
+  );
+  if (dp) {
+    if (dp.duration) {
+      const mins = Math.round(dp.duration / 60);
+      return `Done today · ${mins} min logged`;
+    }
+    return "Done today";
+  }
+  return "Not yet today";
+}
+
+function getSyncLabel(goal: Goal): string {
+  if (goal.tracking_method === "connected" && goal.connected_app) {
+    return `${goal.connected_app} · auto`;
+  }
+  if (goal.tracking_method === "timer") return "Built-in timer";
+  return "Manual";
+}
+
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -71,10 +138,7 @@ export default function DashboardPage() {
   const [notifStatus, setNotifStatus] = useState<"idle" | "requesting" | "granted" | "denied">("idle");
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-      return;
-    }
+    if (status === "unauthenticated") { router.push("/login"); return; }
     if (status === "authenticated") {
       fetchGoals();
       checkPaymentMethod();
@@ -135,13 +199,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleArchive = async (id: string) => {
-    await fetch(`/api/goals/${id}`, { method: "DELETE" });
-    setGoals((prev) => prev.filter((g) => g.id !== id));
-  };
-
-  const activeGoals = goals.filter((g) => g.status === "active");
-
   if (status === "loading" || (status === "authenticated" && loading)) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
@@ -169,51 +226,31 @@ export default function DashboardPage() {
         <Link href="/" style={{ fontSize: 18, fontWeight: 500, color: "var(--text-primary)", letterSpacing: "-0.02em", textDecoration: "none" }}>
           Sworn.
         </Link>
-
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {session?.user?.name && (
-            <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>{session.user.name}</span>
-          )}
-          <button
-            onClick={() => setShowModal(true)}
-            style={{ fontSize: 13, fontWeight: 500, background: "var(--text-primary)", color: "#fff", padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit" }}
-          >
-            + New goal
-          </button>
-          <button
-            onClick={() => signOut({ callbackUrl: "/" })}
-            style={{ fontSize: 13, color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-          >
-            Log out
-          </button>
-        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          style={{ fontSize: 13, fontWeight: 500, background: "var(--text-primary)", color: "#fff", padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit" }}
+        >
+          + New goal
+        </button>
       </header>
 
-      {/* No payment method banner */}
+      {/* Banners */}
       {hasPaymentMethod === false && (
         <div style={{ background: "#FFF8EC", borderBottom: "0.5px solid rgba(181,130,40,0.25)", padding: "12px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <p style={{ fontSize: 13, color: "#854F0B" }}>
             Add a payment method before setting a goal — it&apos;s what makes the commitment real.
           </p>
-          <Link
-            href="/dashboard/add-payment"
-            style={{ fontSize: 13, fontWeight: 500, color: "#854F0B", background: "rgba(181,130,40,0.12)", border: "0.5px solid rgba(181,130,40,0.3)", padding: "6px 14px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}
-          >
+          <Link href="/dashboard/add-payment" style={{ fontSize: 13, fontWeight: 500, color: "#854F0B", background: "rgba(181,130,40,0.12)", border: "0.5px solid rgba(181,130,40,0.3)", padding: "6px 14px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}>
             Add card →
           </Link>
         </div>
       )}
-
-      {/* Notification permission banner */}
-      {notifStatus === "idle" && "Notification" in (typeof window !== "undefined" ? window : {}) && Notification.permission === "default" && (
+      {notifStatus === "idle" && typeof window !== "undefined" && "Notification" in window && Notification.permission === "default" && (
         <div style={{ background: "#F0F4FF", borderBottom: "0.5px solid rgba(37,99,235,0.2)", padding: "12px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <p style={{ fontSize: 13, color: "#1e40af" }}>
             Turn on reminders — Sworn will nudge you when it&apos;s time to log your session.
           </p>
-          <button
-            onClick={requestNotificationPermission}
-            style={{ fontSize: 13, fontWeight: 500, color: "#1e40af", background: "rgba(37,99,235,0.1)", border: "0.5px solid rgba(37,99,235,0.25)", padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}
-          >
+          <button onClick={requestNotificationPermission} style={{ fontSize: 13, fontWeight: 500, color: "#1e40af", background: "rgba(37,99,235,0.1)", border: "0.5px solid rgba(37,99,235,0.25)", padding: "6px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>
             Enable reminders
           </button>
         </div>
@@ -221,12 +258,12 @@ export default function DashboardPage() {
 
       {/* Content */}
       <main style={{ maxWidth: 860, margin: "0 auto", padding: "48px 40px" }}>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 500, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 6 }}>
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.02em", color: "var(--text-primary)", marginBottom: 4 }}>
             Your goals
           </h1>
           <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>
-            {activeGoals.length} active {activeGoals.length === 1 ? "goal" : "goals"}
+            {goals.length} active {goals.length === 1 ? "goal" : "goals"}
           </p>
         </div>
 
@@ -245,71 +282,77 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {goals.map((goal) => (
-              <div
-                key={goal.id}
-                style={{
-                  background: "var(--bg-secondary)",
-                  border: "0.5px solid var(--border)",
-                  borderRadius: 12,
-                  padding: "20px 24px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 16,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusDot[goal.status] ?? "#888", flexShrink: 0 }} />
-                  <div>
-                    <p style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)", marginBottom: 4 }}>
-                      {goal.title}
+            {goals.map((goal) => {
+              const dots = getWeekDots(goal);
+              const statusDotColor = getCardStatusDot(goal);
+              const todayMeta = getTodayMeta(goal);
+              const syncLabel = getSyncLabel(goal);
+
+              return (
+                <Link
+                  key={goal.id}
+                  href={`/dashboard/goals/${goal.id}`}
+                  style={{ textDecoration: "none" }}
+                >
+                  <div
+                    style={{
+                      background: "var(--bg-secondary)",
+                      border: "0.5px solid var(--border)",
+                      borderRadius: 14,
+                      padding: "18px 20px",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--border-md)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                      <p style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)", lineHeight: 1.3 }}>
+                        {goal.title}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
+                          ${goal.pledge_amount}
+                        </span>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusDotColor, flexShrink: 0 }} />
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 14 }}>
+                      {todayMeta}
                     </p>
-                    <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                      {goal.frequency} · {goal.metric} · {statusLabel[goal.status]}
-                      {goal.tracking_app ? ` · ${goal.tracking_app}` : ""}
-                    </p>
+
+                    {dots.length > 0 && (
+                      <div style={{ display: "flex", gap: 5, marginBottom: 14 }}>
+                        {dots.map((d, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              background: getDotColor(d.status),
+                              flexShrink: 0,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: (goal.streak_count ?? 0) > 0 ? "#854F0B" : "var(--text-tertiary)" }}>
+                        {(goal.streak_count ?? 0) > 0
+                          ? `🔥 ${goal.streak_count} day streak`
+                          : "No streak yet"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                        {syncLabel}
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                  {/* Streak badge */}
-                  {goal.status === "active" && (goal.streak_count ?? 0) > 0 && (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        color: "#854F0B",
-                        background: "#FFF8EC",
-                        border: "0.5px solid rgba(181,130,40,0.3)",
-                        borderRadius: 99,
-                        padding: "2px 10px",
-                        whiteSpace: "nowrap",
-                      }}
-                      title={`${goal.streak_count} day streak`}
-                    >
-                      {goal.streak_count} day streak
-                    </span>
-                  )}
-
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
-                    ${goal.pledge_amount}
-                  </span>
-                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", border: "0.5px solid var(--border)", borderRadius: 99, padding: "2px 10px", background: "#fff" }}>
-                    on the line
-                  </span>
-                  {goal.status === "active" && (
-                    <button
-                      onClick={() => handleArchive(goal.id)}
-                      title="Archive goal"
-                      style={{ fontSize: 11, color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit" }}
-                    >
-                      Archive
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>
@@ -318,12 +361,11 @@ export default function DashboardPage() {
         <NewGoalModal
           hasPaymentMethod={hasPaymentMethod === true}
           onClose={() => setShowModal(false)}
-          onCreated={(goal) => {
-            setGoals((prev) => [goal, ...prev]);
-            setShowModal(false);
-          }}
+          onCreated={(goal) => { setGoals((prev) => [goal, ...prev]); setShowModal(false); }}
         />
       )}
+
+      <BottomNav />
 
       <style>{`
         @media (max-width: 768px) {

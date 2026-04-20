@@ -3,12 +3,28 @@ import bcrypt from "bcryptjs";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createStripeCustomer } from "@/lib/stripe";
 
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
 export async function POST(req: NextRequest) {
-  const { email, password, name } = await req.json();
+  const { email, password, name, username } = await req.json();
 
   if (!email || !password) {
     return NextResponse.json(
       { error: "Email and password are required." },
+      { status: 400 }
+    );
+  }
+
+  if (!username) {
+    return NextResponse.json(
+      { error: "Username is required." },
+      { status: 400 }
+    );
+  }
+
+  if (!USERNAME_RE.test(username)) {
+    return NextResponse.json(
+      { error: "Username must be 3–20 characters: lowercase letters, numbers, and underscores only." },
       { status: 400 }
     );
   }
@@ -23,16 +39,30 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = email.toLowerCase().trim();
   const db = getSupabaseAdmin();
 
-  // Check for existing user
-  const { data: existing } = await db
+  // Check for existing email
+  const { data: existingEmail } = await db
     .from("users")
     .select("id")
     .eq("email", normalizedEmail)
-    .single();
+    .maybeSingle();
 
-  if (existing) {
+  if (existingEmail) {
     return NextResponse.json(
       { error: "An account with this email already exists." },
+      { status: 409 }
+    );
+  }
+
+  // Check for existing username
+  const { data: existingUsername } = await db
+    .from("users")
+    .select("id")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (existingUsername) {
+    return NextResponse.json(
+      { error: "That username is already taken." },
       { status: 409 }
     );
   }
@@ -43,16 +73,17 @@ export async function POST(req: NextRequest) {
   // Create Stripe customer
   const customer = await createStripeCustomer(normalizedEmail, name);
 
-  // Insert user into Supabase
+  // Insert user
   const { data: user, error } = await db
     .from("users")
     .insert({
       email: normalizedEmail,
       name: name ?? null,
+      username,
       password_hash,
       stripe_customer_id: customer.id,
     })
-    .select("id, email, name")
+    .select("id, email, name, username")
     .single();
 
   if (error) {

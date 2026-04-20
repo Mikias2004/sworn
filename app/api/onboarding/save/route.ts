@@ -15,6 +15,11 @@ export async function POST(req: NextRequest) {
     frequency,
     pledge_amount,
     tracking_app,
+    tracking_method,
+    connected_app,
+    target_duration_seconds,
+    started_via_goal_id,
+    started_via_type,
   } = await req.json();
 
   if (!title || !frequency || !pledge_amount) {
@@ -24,7 +29,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Derive metric from frequency string
   const metric =
     frequency === "daily"
       ? "1× per day"
@@ -33,6 +37,10 @@ export async function POST(req: NextRequest) {
       : frequency === "3x_week"
       ? "3× per week"
       : frequency;
+
+  const derivedMethod =
+    tracking_method ??
+    (tracking_app ? "connected" : "manual");
 
   const { data: goal, error } = await getSupabaseAdmin()
     .from("goals")
@@ -44,6 +52,11 @@ export async function POST(req: NextRequest) {
       pledge_amount,
       status: "active",
       tracking_app: tracking_app ?? null,
+      tracking_method: derivedMethod,
+      connected_app: connected_app ?? tracking_app ?? null,
+      target_duration_seconds: target_duration_seconds ?? null,
+      started_via_goal_id: started_via_goal_id ?? null,
+      started_via_type: started_via_type ?? null,
     })
     .select("*")
     .single();

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { signIn } from "next-auth/react";
 
 const inputStyle: React.CSSProperties = {
@@ -26,24 +26,72 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 6,
 };
 
+type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
+
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced username availability check
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!username) {
+      setUsernameStatus("idle");
+      return;
+    }
+
+    if (!USERNAME_RE.test(username)) {
+      setUsernameStatus("invalid");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/check-username?username=${encodeURIComponent(username)}`
+        );
+        const data = await res.json();
+        setUsernameStatus(data.available ? "available" : "taken");
+      } catch {
+        setUsernameStatus("idle");
+      }
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [username]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (usernameStatus !== "available") {
+      setError(
+        usernameStatus === "taken"
+          ? "That username is already taken."
+          : "Please enter a valid, available username."
+      );
+      return;
+    }
+
     setLoading(true);
 
-    // 1. Create the account
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, username, password }),
     });
 
     const data = await res.json();
@@ -54,7 +102,6 @@ export default function SignupPage() {
       return;
     }
 
-    // 2. Sign in automatically after account creation
     const result = await signIn("credentials", {
       email,
       password,
@@ -69,6 +116,45 @@ export default function SignupPage() {
 
     router.push("/onboarding/goal");
   };
+
+  // Username field hint text
+  const usernameHint = () => {
+    switch (usernameStatus) {
+      case "checking":
+        return (
+          <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
+            Checking…
+          </span>
+        );
+      case "available":
+        return (
+          <span style={{ color: "#2D7A4A", fontSize: 12, fontWeight: 500 }}>
+            ✓ Available
+          </span>
+        );
+      case "taken":
+        return (
+          <span style={{ color: "#A32D2D", fontSize: 12 }}>
+            ✗ Username is taken
+          </span>
+        );
+      case "invalid":
+        return (
+          <span style={{ color: "#A32D2D", fontSize: 12 }}>
+            ✗ 3–20 chars, lowercase letters, numbers, and underscores only
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const usernameBorderColor =
+    usernameStatus === "available"
+      ? "#2D7A4A"
+      : usernameStatus === "taken" || usernameStatus === "invalid"
+      ? "#A32D2D"
+      : "var(--border-md)";
 
   return (
     <div
@@ -124,7 +210,10 @@ export default function SignupPage() {
         >
           <div>
             <label htmlFor="name" style={labelStyle}>
-              Name <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(optional)</span>
+              Name{" "}
+              <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
+                (optional)
+              </span>
             </label>
             <input
               id="name"
@@ -149,6 +238,23 @@ export default function SignupPage() {
               required
               style={inputStyle}
             />
+          </div>
+
+          <div>
+            <label htmlFor="username" style={labelStyle}>
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              placeholder="Choose a username"
+              required
+              autoComplete="username"
+              style={{ ...inputStyle, border: `0.5px solid ${usernameBorderColor}` }}
+            />
+            <div style={{ marginTop: 5, minHeight: 18 }}>{usernameHint()}</div>
           </div>
 
           <div>
@@ -184,7 +290,7 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || usernameStatus === "checking"}
             style={{
               width: "100%",
               fontSize: 14,
@@ -197,7 +303,7 @@ export default function SignupPage() {
               cursor: loading ? "default" : "pointer",
               fontFamily: "inherit",
               marginTop: 4,
-              opacity: loading ? 0.6 : 1,
+              opacity: loading || usernameStatus === "checking" ? 0.6 : 1,
               transition: "opacity 0.15s ease",
             }}
           >

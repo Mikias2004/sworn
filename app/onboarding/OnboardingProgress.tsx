@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 const steps = [
   "/onboarding/goal",
   "/onboarding/frequency",
-  "/onboarding/stake",
   "/onboarding/connect",
+  "/onboarding/stake",
   "/onboarding/payment",
 ];
 

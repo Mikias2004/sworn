@@ -10,11 +10,13 @@ export async function GET() {
   }
 
   const userId = (session.user as any).id;
+  const supabase = getSupabaseAdmin();
 
-  const { data: goals, error } = await getSupabaseAdmin()
+  const { data: goals, error } = await supabase
     .from("goals")
     .select("*")
     .eq("user_id", userId)
+    .eq("status", "active")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -22,7 +24,33 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch goals." }, { status: 500 });
   }
 
-  return NextResponse.json({ goals });
+  // Fetch last 7 days of datapoints for all active goals
+  const activeIds = (goals ?? []).filter((g) => g.status === "active").map((g) => g.id);
+  let datapointsByGoal: Record<string, any[]> = {};
+
+  if (activeIds.length > 0) {
+    const since = new Date();
+    since.setDate(since.getDate() - 6);
+    since.setHours(0, 0, 0, 0);
+
+    const { data: dps } = await supabase
+      .from("datapoints")
+      .select("id, goal_id, met_target, logged_at, duration")
+      .in("goal_id", activeIds)
+      .gte("logged_at", since.toISOString());
+
+    for (const dp of dps ?? []) {
+      if (!datapointsByGoal[dp.goal_id]) datapointsByGoal[dp.goal_id] = [];
+      datapointsByGoal[dp.goal_id].push(dp);
+    }
+  }
+
+  const goalsWithDatapoints = (goals ?? []).map((g) => ({
+    ...g,
+    recent_datapoints: datapointsByGoal[g.id] ?? [],
+  }));
+
+  return NextResponse.json({ goals: goalsWithDatapoints });
 }
 
 export async function POST(req: NextRequest) {

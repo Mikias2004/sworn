@@ -94,20 +94,39 @@ export default function Nav() {
         </button>
       </div>
 
-      <Link
-        href="/signup"
-        style={{
-          fontSize: 13,
-          fontWeight: 500,
-          background: "var(--text-primary)",
-          color: "#fff",
-          padding: "8px 18px",
-          borderRadius: 8,
-          textDecoration: "none",
-        }}
-      >
-        Start for free
-      </Link>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Link
+          href="/login"
+          style={{
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            textDecoration: "none",
+            padding: "8px 14px",
+          }}
+          onMouseEnter={(e) =>
+            ((e.target as HTMLElement).style.color = "var(--text-primary)")
+          }
+          onMouseLeave={(e) =>
+            ((e.target as HTMLElement).style.color = "var(--text-secondary)")
+          }
+        >
+          Log in
+        </Link>
+        <Link
+          href="/signup"
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            background: "var(--text-primary)",
+            color: "#fff",
+            padding: "8px 18px",
+            borderRadius: 8,
+            textDecoration: "none",
+          }}
+        >
+          Start for free
+        </Link>
+      </div>
 
       <style>{`
         @media (max-width: 768px) {

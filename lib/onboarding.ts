@@ -9,6 +9,8 @@ export type OnboardingState = {
   pledgeAmount: number;
   trackingApp: string | null;
   recommendedTrackingMethod: "timer" | "connected" | "manual" | null;
+  startedViaGoalId: string | null;
+  startedViaType: "friend_feed" | "discover" | "profile" | null;
 };
 
 const KEY = "sworn_onboarding";

@@ -2,8 +2,16 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron/notify",
+      "path": "/api/cron/notify?type=morning",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/notify?type=midday",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/notify?type=danger_zone",
+      "schedule": "0 3 * * *"
     }
   ]
 }
