@@ -42,7 +42,10 @@ export async function POST(req: NextRequest) {
     tracking_method ??
     (tracking_app ? "connected" : "manual");
 
-  const { data: goal, error } = await getSupabaseAdmin()
+  const db = getSupabaseAdmin();
+
+  // Attempt full insert (works when all migrations have been applied).
+  const { data: goal, error: fullError } = await db
     .from("goals")
     .insert({
       user_id: userId,
@@ -61,10 +64,60 @@ export async function POST(req: NextRequest) {
     .select("*")
     .single();
 
-  if (error) {
-    console.error("Onboarding save error:", error);
-    return NextResponse.json({ error: "Failed to save goal." }, { status: 500 });
+  if (!fullError) {
+    return NextResponse.json({ goal }, { status: 201 });
   }
 
-  return NextResponse.json({ goal }, { status: 201 });
+  // Full insert failed — likely because migration columns are missing.
+  // Fall back to base-schema-only insert so goal creation always works.
+  console.error(
+    "Onboarding save (full insert) failed — pending migrations?",
+    JSON.stringify(fullError)
+  );
+
+  const { data: baseGoal, error: baseError } = await db
+    .from("goals")
+    .insert({
+      user_id: userId,
+      title,
+      frequency,
+      metric,
+      pledge_amount,
+      status: "active",
+    })
+    .select("*")
+    .single();
+
+  if (baseError) {
+    console.error("Onboarding save (base insert) failed:", JSON.stringify(baseError));
+    return NextResponse.json(
+      { error: baseError.message ?? "Failed to save goal." },
+      { status: 500 }
+    );
+  }
+
+  // Base goal saved. Attempt to patch tracking columns (silently skip if
+  // columns don't exist yet — run migration 007 to enable them).
+  const trackingPatch: Record<string, unknown> = {
+    tracking_app: tracking_app ?? null,
+    tracking_method: derivedMethod,
+    connected_app: connected_app ?? tracking_app ?? null,
+    target_duration_seconds: target_duration_seconds ?? null,
+    started_via_goal_id: started_via_goal_id ?? null,
+    started_via_type: started_via_type ?? null,
+  };
+
+  const { error: patchError } = await db
+    .from("goals")
+    .update(trackingPatch)
+    .eq("id", baseGoal.id);
+
+  if (patchError) {
+    console.warn(
+      "Tracking patch skipped (run pending migrations to enable):",
+      patchError.message
+    );
+  }
+
+  return NextResponse.json({ goal: baseGoal }, { status: 201 });
 }
